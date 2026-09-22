@@ -1,0 +1,8 @@
+export interface ApiResponse<T> { flag: boolean; status: number; msg: string; data: T | null; }
+export interface PagewiseModel { pageNumber: number; pageSize: number; }
+export interface AuthTokens { accessToken: string; tokenType: string; expiresAtUtc: string; refreshToken: string; }
+export interface CallRecord { name: string; caller_phone: string | null; isCaller: boolean; date_of_birth: string; status: string; createdAt: string; totalCount?: number; }
+export interface SessionRecord { id: number; session_id: string; caller_phone: string | null; account_id: string | null; intent: string | null; conversation_status: string; transcript: string | null; started_at: string; ended_at: string | null; createdAt: string; totalCount: number; }
+export interface BookingRequest { id: number; session_Id: string | null; account_id: string | null; practitioner_id: string | null; location_id: string | null; preferred_Date: string | null; practitioner_Name: string | null; location_Name: string | null; appointment_type: string | null; reason: string | null; status: boolean | null; createdAt: string | null; modifiedAt: string | null; totalCount: number; }
+export interface Appointment { id: number; session_Id: string | null; appointment_id: string | null; account_id: string | null; service_type: string | null; practitioner_id: string | null; location_id: string | null; appointment_type: string | null; reason: string | null; date: string | null; time: string | null; new_Patient: boolean | null; action: string; action_status: boolean; status: boolean | null; createdAt: string | null; totalCount: number; }
+export interface ConversationTurn { bot?: string; user?: string; timestamp?: string; }
