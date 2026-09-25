@@ -1,6 +1,6 @@
 <main class="login-page">
   <section class="login-brand">
-    <div class="brand-lockup"><span class="brand-mark">+</span><span>UG<span>SC</span></span></div>
+    <div class="brand-lockup"><img class="brand-mark" src="logo.png" alt="Aidentive"><span>Aidentive</span></div>
     <div class="brand-copy">
       <p class="eyebrow">MEDICAL OPERATIONS PLATFORM</p>
       <h1>Clarity for every<br><em>patient conversation.</em></h1>
@@ -10,14 +10,14 @@
   </section>
   <section class="login-panel">
     <div class="login-card">
-      <div class="mobile-brand"><span class="brand-mark">+</span><strong>UG<span>SC</span></strong></div>
+      <div class="mobile-brand"><img class="brand-mark" src="logo.png" alt="Aidentive"><strong>Aidentive</strong></div>
       <p class="eyebrow">WELCOME BACK</p><h2>Sign in to your workspace</h2><p class="muted">Use your organization credentials to continue.</p>
       <form (ngSubmit)="submit()">
         <label>Username<input name="username" [(ngModel)]="username" autocomplete="username" placeholder="Enter your username"></label>
         <label>Password<div class="password-wrap"><input name="password" [(ngModel)]="password" [type]="showPassword ? 'text' : 'password'" autocomplete="current-password" placeholder="Enter your password"><button type="button" (click)="showPassword = !showPassword">{{ showPassword ? 'Hide' : 'Show' }}</button></div></label>
         <div class="form-row"><label class="check"><input type="checkbox" name="remember" [(ngModel)]="remember"><span>Remember me</span></label><a href="#" (click)="$event.preventDefault()">Forgot password?</a></div>
-        <div class="alert" *ngIf="error" role="alert">{{ error }}</div>
-        <button class="primary-btn login-btn" type="submit" [disabled]="loading">{{ loading ? 'Signing in…' : 'Sign in' }} <span *ngIf="!loading">→</span></button>
+        <div class="alert" *ngIf="error()" role="alert">{{ error() }}</div>
+        <button class="primary-btn login-btn" type="submit" [disabled]="loading()">{{ loading() ? 'Signing in…' : 'Sign in' }} <span *ngIf="!loading()">→</span></button>
       </form>
       <p class="login-foot">Need access? Contact your practice administrator.</p>
     </div>

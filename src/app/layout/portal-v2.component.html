@@ -1,0 +1,180 @@
+<div class="portal2">
+  <header class="topbar2">
+    <div class="brand2"><span class="brand-chip"><img class="brand-mark" src="logo.png" alt="Aidentive"></span><span class="wordmark">Aidentive</span></div>
+    <nav class="section-nav"><button *ngFor="let section of sectionOrder" class="section-btn" [class.active]="activeSection()===section" (click)="navigate(sectionItems(section)[0].key)">{{ sectionLabel(section) }}</button></nav>
+    <div class="topbar2-right">
+      <span class="clock2">{{ clockLabel() }}</span>
+      <div class="profile2" [class.open]="profileMenuOpen()" (click)="toggleProfileMenu()">
+        <div class="avatar2">AM</div><span class="chevron2">⌄</span>
+        <div class="profile-menu2" *ngIf="profileMenuOpen()" (click)="$event.stopPropagation()">
+          <div class="profile-menu-head2"><strong>{{auth.username}}</strong><small>Practice operations</small></div>
+          <button class="profile-menu-item2" *ngIf="!logoutConfirming()" (click)="logoutConfirming.set(true)">↪ Log out</button>
+          <div class="logout-confirm2" *ngIf="logoutConfirming()"><p>Log out of Aidentive?</p><div class="logout-confirm-actions2"><button class="confirm-no2" (click)="logoutConfirming.set(false)">No</button><button class="confirm-yes2" (click)="logout()">Yes</button></div></div>
+        </div>
+      </div>
+    </div>
+  </header>
+  <div class="profile-menu-backdrop2" *ngIf="profileMenuOpen()" (click)="closeProfileMenu()"></div>
+
+  <div class="tab-strip2" *ngIf="sectionItems(activeSection()).length > 1"><button *ngFor="let item of sectionItems(activeSection())" class="tab2" [class.active]="current()===item.key" (click)="navigate(item.key)"><span class="tab-icon2">{{item.icon}}</span>{{item.label}}<b class="tab-badge2" *ngIf="current()===item.key && current()!=='dashboard' && total()>0">{{ total() }}</b></button></div>
+
+  <main class="content2">
+    <ng-container *ngIf="current()==='dashboard'">
+      <section class="welcome2"><div><span class="soft-label2">WORKFLOW OVERVIEW</span><h1>{{ greeting(now()) }}, team</h1><p>Here’s what is happening across your patient access workflow today.</p></div></section>
+      <div class="quick-grid2"><button *ngFor="let item of nav" class="quick-card2" [class.hidden2]="item.key==='dashboard'||item.key==='reports'||item.key==='settings'" (click)="navigate(item.key)"><span class="quick-icon2">{{item.icon}}</span><div><strong>{{item.label}}</strong><small>Jump into this queue</small></div><b>→</b></button></div>
+    </ng-container>
+    <ng-container *ngIf="current()==='reports'">
+      <div class="ur-search2">
+        <div class="ur-field2"><label>Patient Name</label><input type="text" placeholder="e.g. Anderson, Emily" [ngModel]="userReportName()" (ngModelChange)="userReportName.set($event)"></div>
+        <div class="ur-field2"><label>Date of Birth</label><input type="date" [ngModel]="userReportDob()" (ngModelChange)="userReportDob.set($event)"></div>
+        <button class="ur-search-btn2" (click)="searchUserReport()">⌕ Search</button>
+      </div>
+
+      <div class="coming2" *ngIf="!userReportSearched()"><span class="coming-icon2">▥</span><h2>Look up a patient</h2><p>Enter a patient name and date of birth, then search to view their record.</p></div>
+
+      <div class="ur-panel2" *ngIf="userReportSearched()">
+        <div class="ur-main2">
+          <div class="ur-panel-head2">
+            <a class="ur-link2" (click)="clearUserReport()">‹ Cancel</a>
+            <div class="ur-patient-title2">{{ userReportName() || 'Patient name' }} <span *ngIf="userReportDob()">· {{ formatDate(userReportDob()) }}</span></div>
+            <div class="ur-panel-actions2"><a class="ur-link2">Save</a><span>|</span><button class="ur-checkin2">Start Check-In ›</button></div>
+          </div>
+          <div class="ur-flags2">
+            <button class="ur-flag2 ur-flag-warn2">⚑ Add a Billing Alert</button>
+            <button class="ur-flag2 ur-flag-outline2">⚑ Add Patient Flag</button>
+          </div>
+
+          <div class="ur-card2">
+            <div class="ur-card-head2">Manage Existing Appointment</div>
+            <div class="ur-card-body2">
+              <div class="ur-appt-date2">—</div>
+              <div class="ur-btn-row2">
+                <button class="ur-btn2" disabled>Link Appointment ▾</button>
+                <button class="ur-btn2 ur-btn-outline2">Cancel Appointment</button>
+                <button class="ur-btn2 ur-btn-solid2">Reschedule</button>
+              </div>
+
+              <div class="ur-grid2">
+                <div class="ur-fg2"><label>Appointment Date</label><input type="text" disabled placeholder="—"></div>
+                <div class="ur-fg2"><label>Status *</label><select disabled><option>—</option></select></div>
+              </div>
+              <div class="ur-grid2 ur-grid3-2">
+                <div class="ur-fg2"><label>Appointment Type *</label><input type="text" disabled placeholder="—"></div>
+                <div class="ur-fg2"><label>Start Time</label><input type="text" disabled placeholder="—"></div>
+                <div class="ur-fg2"><label>Duration</label><input type="text" disabled placeholder="—"></div>
+              </div>
+              <div class="ur-grid2 ur-grid3-2">
+                <div class="ur-fg2"><label>End Time</label><input type="text" disabled placeholder="—"></div>
+                <div class="ur-fg2"><label>Recurring Option</label><select disabled><option>—</option></select></div>
+                <div class="ur-fg2"></div>
+              </div>
+
+              <div class="ur-static-grid2">
+                <div><label>Patient Name</label><strong>{{ userReportName() || '—' }}</strong></div>
+                <div><label>Provider</label><strong>—</strong></div>
+                <div><label>Location</label><strong>—</strong></div>
+              </div>
+
+              <label class="ur-check2"><input type="checkbox" disabled> New Patient</label>
+
+              <div class="ur-fg2"><label>Reason For Visit</label><select disabled><option>Select reason</option></select></div>
+              <div class="ur-fg2"><label>Reason For Visit Notes</label><textarea disabled rows="2"></textarea></div>
+              <div class="ur-fg2"><label>Reserve Resources</label><input type="text" disabled placeholder="Click to select..."></div>
+              <div class="ur-fg2"><label>Appointment Notes</label><textarea disabled rows="2"></textarea></div>
+
+              <label class="ur-check2"><input type="checkbox" disabled> Add to Waitlist</label>
+
+              <div class="ur-fg2"><label>Appointment Reminders</label><a class="ur-link2">0 Reminders</a></div>
+              <div class="ur-fg2"><label>Referral Sources</label><a class="ur-link2">+ Add Referral Source</a></div>
+            </div>
+          </div>
+        </div>
+
+        <aside class="ur-side2">
+          <div class="ur-photo2">👤</div>
+          <button class="ur-photo-btn2">Get Photo ▾</button>
+          <div class="ur-side-row2"><label>Patient Name</label><a class="ur-link2">{{ userReportName() || '—' }}</a></div>
+          <div class="ur-side-row2"><label>MRN</label><span>—</span></div>
+          <div class="ur-side-row2"><label>Status</label><select disabled><option>Active</option></select></div>
+          <a class="ur-link2 ur-side-link2">Release of PHI</a>
+
+          <h4>Upcoming Appointments</h4>
+          <p class="ur-muted2">No upcoming appointments.</p>
+
+          <h4>Past Completed Appointments</h4>
+          <p class="ur-muted2">No past appointments.</p>
+
+          <a class="ur-link2 ur-side-link2">View Full History</a>
+        </aside>
+      </div>
+    </ng-container>
+    <ng-container *ngIf="current()==='settings'"><div class="coming2"><span class="coming-icon2">⚙</span><h2>Practice settings</h2><p>Profile, notification preferences, and practice configuration will live here.</p></div></ng-container>
+    <ng-container *ngIf="current()!=='dashboard' && current()!=='reports' && current()!=='settings'">
+      <div class="ch-layout2" [class.ch-split2]="current()==='appointments'">
+      <div class="ch-main2">
+      <div class="toolbar2"><div class="search2">⌕<input [ngModel]="search()" (ngModelChange)="search.set($event)" placeholder="Search by Name, Phone or DOB"></div><button class="refresh-btn2" (click)="load()">↻ Refresh</button></div>
+      <div class="table-card2">
+        <div class="loading-state2" *ngIf="loading()"><div class="spinner2"></div><p>Loading workspace data…</p></div>
+        <div class="error-state2" *ngIf="!loading() && error()"><strong>Unable to load records</strong><p>{{error()}}</p><button class="refresh-btn2" (click)="load()">Try again</button></div>
+        <div class="empty-state2" *ngIf="!loading() && !error() && ((current()==='appointments'&&callHistory().length===0)||(current()==='appointment-requests'&&bookings().length===0)||(isReportPage()&&filteredReports().length===0))"><span>◌</span><strong>No {{current()==='appointment-requests'?'appointment requests':current()==='appointments'?'call history':current()}} found</strong><p>New records will appear here when they are available.</p></div>
+        <div class="table-scroll2" *ngIf="!loading() && !error() && ((current()==='appointments'&&callHistory().length)||(current()==='appointment-requests'&&bookings().length)||(isReportPage()&&filteredReports().length))">
+          <table>
+            <thead>
+              <tr *ngIf="current()==='appointments'"><th>Mobile</th><th>Status</th><th>Duration</th><th>Date &amp; time</th></tr>
+              <tr *ngIf="current()==='appointment-requests'"><th>Request ID</th><th>Account</th><th>Practitioner</th><th>Location</th><th>Preferred date</th><th>Status</th><th></th></tr>
+              <tr *ngIf="current()==='cancel-appointment-report'"><th>Mobile</th><th>Patient</th><th>Date of birth</th><th>Appointment date</th><th>Last update</th><th>Created</th><th class="th-badge2"></th><th class="th-compact2"></th><th class="th-compact2"></th></tr>
+              <tr *ngIf="current()==='medical-staff-report'"><th>Mobile</th><th>Patient</th><th>Reason</th><th>Last update</th><th>Created</th><th class="th-badge2"></th><th class="th-compact2"></th><th class="th-compact2"></th></tr>
+              <tr *ngIf="current()==='book-appointment-report'"><th>Mobile</th><th>Patient</th><th>Reason</th><th>Preferred date</th><th>Last update</th><th>Created</th><th class="th-badge2"></th><th class="th-compact2"></th><th class="th-compact2"></th></tr>
+              <tr *ngIf="current()==='reschedule-appointment-report'"><th>Mobile</th><th>Patient</th><th>Current appointment</th><th>Preferred date</th><th>Last update</th><th>Created</th><th class="th-badge2"></th><th class="th-compact2"></th><th class="th-compact2"></th></tr>
+              <tr *ngIf="current()==='after-hour-report'"><th>Mobile</th><th>Patient</th><th>Reason</th><th>Last update</th><th>Created</th><th class="th-badge2"></th><th class="th-compact2"></th><th class="th-compact2"></th></tr>
+              <tr *ngIf="current()==='voicemail-report'"><th>Mobile</th><th>Patient</th><th>Message</th><th>Last update</th><th>Created</th><th class="th-badge2"></th><th class="th-compact2"></th><th class="th-compact2"></th></tr>
+              <tr *ngIf="current()==='nursing-report'"><th>Mobile</th><th>Patient</th><th>Reason</th><th>Last update</th><th>Created</th><th class="th-badge2"></th><th class="th-compact2"></th><th class="th-compact2"></th></tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let item of callHistory()" class="row-clickable2" [class.row-active2]="current()==='appointments' && selectedSession()?.session_id===item.session_id" (click)="current()==='appointments' && selectCall(callDrawerItem(item))"><ng-container *ngIf="current()==='appointments'"><td><strong>{{item.mobile||'—'}}</strong></td><td><span class="badge2" [class.badge-success2]="item.status==='completed'||item.status==='handoff'">{{item.status||'—'}}</span></td><td>{{formatDuration(item.duration)}}</td><td>{{formatDateTime(item.createdAt)}}</td></ng-container></tr>
+              <tr *ngFor="let item of bookings()"><ng-container *ngIf="current()==='appointment-requests'"><td><strong>REQ-{{item.id}}</strong></td><td>{{item.account_id||'—'}}</td><td>{{item.practitioner_Name||item.practitioner_id||'—'}}</td><td>{{item.location_Name||item.location_id||'—'}}</td><td>{{item.preferred_Date||'—'}}</td><td><span class="badge2" [class.badge-success2]="item.status">{{item.status?'Processed':'Open'}}</span></td><td><button class="row-icon2" (click)="$event.stopPropagation()">✓</button></td></ng-container></tr>
+              <tr *ngFor="let item of filteredReports()" [class.row-read2]="isReadValue(item)">
+                <ng-container *ngIf="current()==='cancel-appointment-report'"><td><strong>{{item.mobile||'—'}}</strong></td><td>{{item.name||'—'}}</td><td>{{formatDate(item.dob)}}</td><td>{{formatDate(item.appointmentDate)}}</td><td>{{formatDateTime(item.lastUpdate)}}</td><td>{{formatDateTime(item.createdOn)}}</td><td class="td-badge2"><span class="badge2" [class.badge-success2]="isReadValue(item)">{{readLabel(item)}}</span></td><td class="td-compact2"><button class="row-icon2" #openBtn (click)="openSession(reportDrawerItem(item), openBtn)">↗</button></td><td class="td-compact2"><button class="punch2" [class.on]="isReadValue(item)" [attr.aria-pressed]="isReadValue(item)" title="Mark as read/unread" (click)="toggleRead(item)">✓</button></td></ng-container>
+                <ng-container *ngIf="current()==='medical-staff-report'"><td><strong>{{item.mobile||'—'}}</strong></td><td>{{item.name||'—'}}</td><td class="truncate2">{{item.reason||'—'}}</td><td>{{formatDateTime(item.lastUpdate)}}</td><td>{{formatDateTime(item.createdOn)}}</td><td class="td-badge2"><span class="badge2" [class.badge-success2]="isReadValue(item)">{{readLabel(item)}}</span></td><td class="td-compact2"><button class="row-icon2" #openBtn (click)="openSession(reportDrawerItem(item), openBtn)">↗</button></td><td class="td-compact2"><button class="punch2" [class.on]="isReadValue(item)" [attr.aria-pressed]="isReadValue(item)" title="Mark as read/unread" (click)="toggleRead(item)">✓</button></td></ng-container>
+                <ng-container *ngIf="current()==='book-appointment-report'"><td><strong>{{item.mobile||'—'}}</strong></td><td>{{item.name||'—'}}</td><td class="truncate2">{{item.reason||'—'}}</td><td>{{item.preferredDate||'—'}}</td><td>{{formatDateTime(item.lastUpdate)}}</td><td>{{formatDateTime(item.createdOn)}}</td><td class="td-badge2"><span class="badge2" [class.badge-success2]="isReadValue(item)">{{readLabel(item)}}</span></td><td class="td-compact2"><button class="row-icon2" #openBtn (click)="openSession(reportDrawerItem(item), openBtn)">↗</button></td><td class="td-compact2"><button class="punch2" [class.on]="isReadValue(item)" [attr.aria-pressed]="isReadValue(item)" title="Mark as read/unread" (click)="toggleRead(item)">✓</button></td></ng-container>
+                <ng-container *ngIf="current()==='reschedule-appointment-report'"><td><strong>{{item.mobile||'—'}}</strong></td><td>{{item.name||'—'}}</td><td>{{item.currentAppointmentDate||'—'}}</td><td>{{item.preferredDate||'—'}}</td><td>{{formatDateTime(item.lastUpdate)}}</td><td>{{formatDateTime(item.createdOn)}}</td><td class="td-badge2"><span class="badge2" [class.badge-success2]="isReadValue(item)">{{readLabel(item)}}</span></td><td class="td-compact2"><button class="row-icon2" #openBtn (click)="openSession(reportDrawerItem(item), openBtn)">↗</button></td><td class="td-compact2"><button class="punch2" [class.on]="isReadValue(item)" [attr.aria-pressed]="isReadValue(item)" title="Mark as read/unread" (click)="toggleRead(item)">✓</button></td></ng-container>
+                <ng-container *ngIf="current()==='after-hour-report'"><td><strong>{{item.mobile||'—'}}</strong></td><td>{{item.name||'—'}}</td><td class="truncate2">{{item.reason||'—'}}</td><td>{{formatDateTime(item.lastUpdate)}}</td><td>{{formatDateTime(item.createdOn)}}</td><td class="td-badge2"><span class="badge2" [class.badge-success2]="isReadValue(item)">{{readLabel(item)}}</span></td><td class="td-compact2"><button class="row-icon2" #openBtn (click)="openSession(reportDrawerItem(item), openBtn)">↗</button></td><td class="td-compact2"><button class="punch2" [class.on]="isReadValue(item)" [attr.aria-pressed]="isReadValue(item)" title="Mark as read/unread" (click)="toggleRead(item)">✓</button></td></ng-container>
+                <ng-container *ngIf="current()==='voicemail-report'"><td><strong>{{item.mobile||'—'}}</strong></td><td>{{item.name||'—'}}</td><td class="truncate2">{{item.transcript||'—'}}</td><td>{{formatDateTime(item.lastUpdate)}}</td><td>{{formatDateTime(item.createdOn)}}</td><td class="td-badge2"><span class="badge2" [class.badge-success2]="isReadValue(item)">{{readLabel(item)}}</span></td><td class="td-compact2"><button class="row-icon2" #openBtn (click)="openSession(reportDrawerItem(item), openBtn)">↗</button></td><td class="td-compact2"><button class="punch2" [class.on]="isReadValue(item)" [attr.aria-pressed]="isReadValue(item)" title="Mark as read/unread" (click)="toggleRead(item)">✓</button></td></ng-container>
+                <ng-container *ngIf="current()==='nursing-report'"><td><strong>{{item.mobile||'—'}}</strong></td><td>{{item.name||'—'}}</td><td class="truncate2">{{item.reason||'—'}}</td><td>{{formatDateTime(item.lastUpdate)}}</td><td>{{formatDateTime(item.createdOn)}}</td><td class="td-badge2"><span class="badge2" [class.badge-success2]="isReadValue(item)">{{readLabel(item)}}</span></td><td class="td-compact2"><button class="row-icon2" #openBtn (click)="openSession(reportDrawerItem(item), openBtn)">↗</button></td><td class="td-compact2"><button class="punch2" [class.on]="isReadValue(item)" [attr.aria-pressed]="isReadValue(item)" title="Mark as read/unread" (click)="toggleRead(item)">✓</button></td></ng-container>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="pagination2" *ngIf="total() && !isReportPage() && current()!=='appointments'"><span>Showing {{(page()-1)*pageSize+1}}–{{Math.min(page()*pageSize,total())}} of {{total()}}</span><div><button [disabled]="page()===1" (click)="pageChange(page()-1)">‹</button><b>{{page()}}</b><button [disabled]="page()*pageSize>=total()" (click)="pageChange(page()+1)">›</button></div></div>
+      </div>
+      <aside class="ch-transcript2" *ngIf="current()==='appointments'">
+        <ng-container *ngIf="selectedSession() as session; else chEmptyHead2"><div class="ch-transcript-head2"><div><span class="eyebrow2">CONVERSATION DETAIL</span><h2>{{session.session_id}}</h2></div><button (click)="selectedSession.set(null)">×</button></div></ng-container>
+        <ng-template #chEmptyHead2><div class="skel-line2 skel-title2"></div></ng-template>
+
+        <div class="player-row2" [class.disabled2]="!hasAudio(selectedSession())"><button class="play-btn2" [disabled]="!hasAudio(selectedSession())">▶</button><input class="scrub2" type="range" min="0" max="100" value="0" disabled><span class="time2">00:00 / 00:00</span><button class="download-btn2" [disabled]="!hasAudio(selectedSession())">⭳</button></div>
+
+        <ng-container *ngIf="selectedSession() as session; else chEmptyBody2">
+          <div class="meta-grid2"><span><b class="meta-icon2">🕐</b>{{formatRecordingMeta(session.createdAt)}}</span><span><b class="meta-icon2">#</b>ID: {{truncateSessionId(session.session_id)}}</span><span><b class="meta-icon2">🏢</b>{{session.account_id||'—'}}</span><span><b class="meta-icon2">☎</b>{{session.caller_phone||'—'}}</span></div>
+          <div class="chat2" *ngIf="transcript(session).length; else chNoTranscript2"><div *ngFor="let turn of transcript(session)" class="bubble-row2" [class.patient-row2]="turn.speaker==='Patient'"><div class="bubble2" [class.patient-bubble2]="turn.speaker==='Patient'"><small>{{turn.speaker}}</small>{{turn.text}}</div></div></div>
+          <ng-template #chNoTranscript2><div class="drawer-empty2">Transcript is not available for this conversation.</div></ng-template>
+        </ng-container>
+        <ng-template #chEmptyBody2>
+          <div class="meta-grid2 skel-meta-grid2"><span class="skel-line2"></span><span class="skel-line2"></span><span class="skel-line2"></span><span class="skel-line2"></span></div>
+          <div class="skel-body2">
+            <div class="skel-line2" style="width:94%"></div>
+            <div class="skel-line2" style="width:82%"></div>
+            <div class="skel-line2" style="width:88%"></div>
+            <div class="skel-line2" style="width:65%"></div>
+            <div class="skel-line2" style="width:90%"></div>
+            <div class="skel-line2" style="width:72%"></div>
+            <div class="skel-line2" style="width:85%"></div>
+          </div>
+          <p class="ch-transcript-choose2">Choose a conversation</p>
+        </ng-template>
+      </aside>
+      </div>
+    </ng-container>
+  </main>
+</div>
+<div class="drawer-backdrop" *ngIf="current()!=='appointments' && selectedSession()" (click)="selectedSession.set(null)"></div><aside class="conversation-drawer2" *ngIf="current()!=='appointments' && selectedSession() as session" [style.top.px]="drawerPos().top" [style.left.px]="drawerPos().left" [style.max-height.px]="drawerPos().maxHeight"><div class="drawer-head2"><div><span class="eyebrow2">CONVERSATION DETAIL</span><h2>{{session.session_id}}</h2></div><button (click)="selectedSession.set(null)">×</button></div><div class="player-row2" [class.disabled2]="!audioUrl(session)"><button class="play-btn2" [disabled]="!audioUrl(session)">▶</button><input class="scrub2" type="range" min="0" max="100" value="0" disabled><span class="time2">00:00 / 00:00</span><button class="download-btn2" [disabled]="!audioUrl(session)">⭳</button></div><div class="meta-grid2"><span><b class="meta-icon2">🕐</b>{{formatRecordingMeta(session.createdAt)}}</span><span><b class="meta-icon2">#</b>ID: {{truncateSessionId(session.session_id)}}</span><span><b class="meta-icon2">🏢</b>{{session.account_id||'—'}}</span><span><b class="meta-icon2">☎</b>{{session.caller_phone||'—'}}</span></div><div class="chat2" *ngIf="transcript(session).length; else noTranscript2"><div *ngFor="let turn of transcript(session)" class="bubble-row2" [class.patient-row2]="turn.speaker==='Patient'"><div class="bubble2" [class.patient-bubble2]="turn.speaker==='Patient'"><small>{{turn.speaker}}</small>{{turn.text}}</div></div></div><ng-template #noTranscript2><div class="drawer-empty2">Transcript is not available for this conversation.</div></ng-template></aside>
