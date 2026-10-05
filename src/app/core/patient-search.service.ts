@@ -20,6 +20,8 @@ export class PatientSearchService {
   appointments = signal<AppointmentDetail[]>([]);
   appointmentsLoading = signal(false);
   appointmentsError = signal('');
+  recentPatients = signal<ModMedPatient[]>(this.loadRecent());
+  recentOpen = signal(false);
   private lastSearchedTerm: string | null = null;
 
   // Accepts common DOB formats (ISO yyyy-MM-dd, or MM/DD/YYYY, MM-DD-YYYY) typed into the
@@ -65,11 +67,7 @@ export class PatientSearchService {
     request$.pipe(finalize(() => this.loading.set(false))).subscribe({
       next: patients => {
         this.results.set(patients);
-        if (patients.length === 1) {
-          this.selected.set(patients[0]);
-          this.dropdownClosed.set(true);
-          this.loadAppointments(patients[0]);
-        }
+        if (patients.length === 1) this.selectPatient(patients[0]);
       },
       error: () => this.error.set('We could not search patients. Please retry.'),
     });
@@ -87,7 +85,21 @@ export class PatientSearchService {
     });
   }
   retryAppointments(): void { const patient = this.selected(); if (patient) this.loadAppointments(patient); }
-  selectPatient(patient: ModMedPatient): void { this.selected.set(patient); this.dropdownClosed.set(true); this.loadAppointments(patient); }
+  private loadRecent(): ModMedPatient[] {
+    try {
+      const parsed = JSON.parse(localStorage.getItem('inbound_recent_patients') || '[]');
+      return Array.isArray(parsed) ? parsed : [];
+    } catch { return []; }
+  }
+  private addRecent(patient: ModMedPatient): void {
+    const next = [patient, ...this.recentPatients().filter(p => p.id !== patient.id)].slice(0, 10);
+    this.recentPatients.set(next);
+    try { localStorage.setItem('inbound_recent_patients', JSON.stringify(next)); } catch { /* storage unavailable */ }
+  }
+  toggleRecent(): void { this.recentOpen.update(v => !v); }
+  closeRecent(): void { this.recentOpen.set(false); }
+  openRecent(patient: ModMedPatient): void { this.selectPatient(patient); this.closeRecent(); }
+  selectPatient(patient: ModMedPatient): void { this.selected.set(patient); this.dropdownClosed.set(true); this.loadAppointments(patient); this.addRecent(patient); }
   backToResults(): void { this.dropdownClosed.set(false); }
   closeDropdown(): void { this.dropdownClosed.set(true); }
   openDropdown(): void { if (this.results().length) this.dropdownClosed.set(false); }

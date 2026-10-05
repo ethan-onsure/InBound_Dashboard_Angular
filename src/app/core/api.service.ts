@@ -40,4 +40,5 @@ export class ApiService {
   patientByFamily(id: string): Observable<ApiResponse<ModMedPatient[]>> { return this.http.post<ApiResponse<ModMedPatient[]>>(`${APP_CONFIG.apiBaseUrl}/api/ModMed/GetPatientDetailsByFamily`, { id }); }
   patientByDob(id: string): Observable<ApiResponse<ModMedPatient[]>> { return this.http.post<ApiResponse<ModMedPatient[]>>(`${APP_CONFIG.apiBaseUrl}/api/ModMed/GetPatientDetailsByDOB`, { id }); }
   appointmentDetails(id: string): Observable<ApiResponse<AppointmentDetail[]>> { return this.http.post<ApiResponse<AppointmentDetail[]>>(`${APP_CONFIG.apiBaseUrl}/api/ModMed/GetAppointmentDetails`, { id }); }
+  recording(sessionId: string): Observable<Blob> { return this.http.get(`${APP_CONFIG.apiBaseUrl}/api/Recording/${encodeURIComponent(sessionId)}`, { responseType: 'blob' }); }
 }

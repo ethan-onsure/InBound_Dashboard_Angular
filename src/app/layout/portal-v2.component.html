@@ -42,6 +42,19 @@
           </div>
         </div>
         <button class="ur-search-btn2" (click)="searchUserReport()">⌕ Search</button>
+        <div class="ur-recent-wrap2">
+          <button class="ur-recent-btn2" title="Recently viewed patients" (click)="toggleRecentPatients()"><i class="bi bi-clock-history"></i></button>
+          <div class="ur-dropdown-backdrop2" *ngIf="recentPatientsOpen()" (click)="closeRecentPatients()"></div>
+          <div class="ur-dropdown2 ur-recent-dropdown2" *ngIf="recentPatientsOpen()" (click)="$event.stopPropagation()">
+            <div class="ur-dropdown-msg2" *ngIf="!recentPatients().length"><strong>No recent patients</strong><p>Patients you open will show up here.</p></div>
+            <div class="ur-dropdown-list2" *ngIf="recentPatients().length">
+              <button class="ur-dropdown-item2" *ngFor="let p of recentPatients()" (click)="openRecentPatient(p)">
+                <span class="ur-dd-name2">{{ p.name?.[0]?.family || '—' }}, {{ (p.name?.[0]?.given || []).join(' ') || '—' }}</span>
+                <span class="ur-dd-meta2"><span>MRN: {{ patientMrn(p) }}</span><span>DOB: {{ formatDate(p.birthDate) }}</span></span>
+              </button>
+            </div>
+          </div>
+        </div>
         <button class="ur-clear-btn2" *ngIf="userReportSearched()" (click)="clearUserReport()">✕ Clear</button>
       </div>
 
@@ -65,11 +78,11 @@
                 <table>
                   <thead>
                     <tr>
-                      <th class="sortable-th2" (click)="toggleApptSort('appointmentType')">Type<span class="sort-ind2" *ngIf="apptSortColumn()==='appointmentType'">{{apptSortDirection()==='asc'?'▲':'▼'}}</span></th>
-                      <th class="sortable-th2" (click)="toggleApptSort('reasonText')">Reason<span class="sort-ind2" *ngIf="apptSortColumn()==='reasonText'">{{apptSortDirection()==='asc'?'▲':'▼'}}</span></th>
-                      <th class="sortable-th2" (click)="toggleApptSort('description')">Description<span class="sort-ind2" *ngIf="apptSortColumn()==='description'">{{apptSortDirection()==='asc'?'▲':'▼'}}</span></th>
-                      <th>Appointment Date</th>
-                      <th class="sortable-th2" (click)="toggleApptSort('startTime')">Time<span class="sort-ind2" *ngIf="apptSortColumn()==='startTime'">{{apptSortDirection()==='asc'?'▲':'▼'}}</span></th>
+                      <th>Type</th>
+                      <th>Reason</th>
+                      <th>Description</th>
+                      <th class="sortable-th2" (click)="toggleApptSort('startTime')">Appointment Date<span class="sort-ind2" *ngIf="apptSortColumn()==='startTime'">{{apptSortDirection()==='asc'?'▲':'▼'}}</span></th>
+                      <th>Time</th>
                       <th class="sortable-th2" (click)="toggleApptSort('status')">Status<span class="sort-ind2" *ngIf="apptSortColumn()==='status'">{{apptSortDirection()==='asc'?'▲':'▼'}}</span></th>
                       <th class="sortable-th2" (click)="toggleApptSort('createdAt')">Created<span class="sort-ind2" *ngIf="apptSortColumn()==='createdAt'">{{apptSortDirection()==='asc'?'▲':'▼'}}</span></th>
                     </tr>
@@ -166,11 +179,11 @@
             <mat-datepicker-toggle matIconSuffix [for]="reportRangePicker"></mat-datepicker-toggle>
             <mat-date-range-picker #reportRangePicker></mat-date-range-picker>
           </mat-form-field>
-          <button class="refresh-btn2" (click)="applyReportDateFilter()">Apply</button>
+          <button class="refresh-btn2 toolbar-btn2" (click)="applyReportDateFilter()">Apply</button>
           <button class="refresh-btn2" *ngIf="reportStartDate() || reportEndDate()" (click)="clearReportDateFilter()">✕ Clear</button>
         </div>
-        <button class="export-btn2" *ngIf="canExport()" [disabled]="exporting()" (click)="exportToExcel()">{{ exporting() ? 'Exporting…' : '⬇ Export' }} <i class="bi bi-file-earmark-spreadsheet-fill"></i></button>
-<button  class="refresh-btn2"  (click)="load()" title="Refresh">  <i class="bi bi-arrow-clockwise"></i></button>
+        <button class="export-btn2 toolbar-btn2" *ngIf="canExport()" [disabled]="exporting()" (click)="exportToExcel()">{{ exporting() ? 'Exporting…' : '⬇ Export' }} <i class="bi bi-file-earmark-spreadsheet-fill"></i></button>
+<button  class="refresh-btn2 toolbar-btn-square2"  (click)="load()" title="Refresh">  <i class="bi bi-arrow-clockwise"></i></button>
       </div>
       <div class="table-card2" *ngIf="current()!=='appointment-requests'">
         <div class="loading-state2" *ngIf="loading()"><div class="spinner2"></div><p>Loading workspace data…</p></div>
@@ -206,10 +219,18 @@
       <div class="pagination2" *ngIf="total() && !isReportPage() && current()!=='appointments' && current()!=='appointment-requests'"><span>Showing {{(page()-1)*pageSize+1}}–{{Math.min(page()*pageSize,total())}} of {{total()}}</span><div><button [disabled]="page()===1" (click)="pageChange(page()-1)">‹</button><b>{{page()}}</b><button [disabled]="page()*pageSize>=total()" (click)="pageChange(page()+1)">›</button></div></div>
       </div>
       <aside class="ch-transcript2" *ngIf="current()==='appointments'">
-        <ng-container *ngIf="selectedSession() as session; else chEmptyHead2"><div class="ch-transcript-head2"><div><span class="eyebrow2">CONVERSATION DETAIL</span><h2>{{session.session_id}}</h2></div><button (click)="selectedSession.set(null)">×</button></div></ng-container>
+        <ng-container *ngIf="selectedSession() as session; else chEmptyHead2"><div class="ch-transcript-head2"><div><span class="eyebrow2">CONVERSATION DETAIL</span><h2>{{session.session_id}}</h2></div><button (click)="closeSession()">×</button></div></ng-container>
         <ng-template #chEmptyHead2><div class="skel-line2 skel-title2"></div></ng-template>
 
-        <div class="player-row2" [class.disabled2]="!hasAudio(selectedSession())"><button class="play-btn2" [disabled]="!hasAudio(selectedSession())">▶</button><input class="scrub2" type="range" min="0" max="100" value="0" disabled><span class="time2">00:00 / 00:00</span><button class="download-btn2" [disabled]="!hasAudio(selectedSession())">⭳</button></div>
+        <ng-container *ngIf="selectedSession() as session">
+          <div class="player-row2" [class.disabled2]="!hasAudio(session)">
+            <button class="play-btn2" [disabled]="!hasAudio(session) || audioLoading()" (click)="toggleAudioPlayback(session)">{{ audioLoading() ? '…' : (audioPlaying() ? '❚❚' : '▶') }}</button>
+            <input class="scrub2" type="range" min="0" max="100" [value]="audioDuration() ? (audioCurrentTime()/audioDuration()*100) : 0" [disabled]="!hasAudio(session)" (input)="seekAudio(session, $any($event.target).value / 100)">
+            <span class="time2">{{ formatAudioTime(audioCurrentTime()) }} / {{ formatAudioTime(audioDuration()) }}</span>
+            <button class="download-btn2" [disabled]="!hasAudio(session)" (click)="downloadAudioRecording(session)">⭳</button>
+          </div>
+          <p class="drawer-error2" *ngIf="audioError()">{{ audioError() }}</p>
+        </ng-container>
 
         <ng-container *ngIf="selectedSession() as session; else chEmptyBody2">
           <div class="meta-grid2"><span><b class="meta-icon2">🕐</b>{{formatRecordingMeta(session.createdAt)}}</span><span><b class="meta-icon2">#</b>ID: {{truncateSessionId(session.session_id)}}</span><span><b class="meta-icon2">🏢</b>{{session.account_id||'—'}}</span><span><b class="meta-icon2">☎</b>{{session.caller_phone||'—'}}</span></div>
@@ -234,4 +255,4 @@
     </ng-container>
   </main>
 </div>
-<div class="drawer-backdrop" *ngIf="current()!=='appointments' && selectedSession()" (click)="selectedSession.set(null)"></div><aside class="conversation-drawer2" *ngIf="current()!=='appointments' && selectedSession() as session" [style.top.px]="drawerPos().top" [style.left.px]="drawerPos().left" [style.max-height.px]="drawerPos().maxHeight"><div class="drawer-head2"><div><span class="eyebrow2">CONVERSATION DETAIL</span><h2>{{session.session_id}}</h2></div><button (click)="selectedSession.set(null)">×</button></div><div class="player-row2" [class.disabled2]="!audioUrl(session)"><button class="play-btn2" [disabled]="!audioUrl(session)">▶</button><input class="scrub2" type="range" min="0" max="100" value="0" disabled><span class="time2">00:00 / 00:00</span><button class="download-btn2" [disabled]="!audioUrl(session)">⭳</button></div><div class="meta-grid2"><span><b class="meta-icon2">🕐</b>{{formatRecordingMeta(session.createdAt)}}</span><span><b class="meta-icon2">#</b>ID: {{truncateSessionId(session.session_id)}}</span><span><b class="meta-icon2">🏢</b>{{session.account_id||'—'}}</span><span><b class="meta-icon2">☎</b>{{session.caller_phone||'—'}}</span></div><div class="chat2" *ngIf="transcript(session).length; else noTranscript2"><div *ngFor="let turn of transcript(session)" class="bubble-row2" [class.patient-row2]="turn.speaker==='Patient'"><div class="bubble2" [class.patient-bubble2]="turn.speaker==='Patient'"><small>{{turn.speaker}}</small>{{turn.text}}</div></div></div><ng-template #noTranscript2><div class="drawer-empty2">Transcript is not available for this conversation.</div></ng-template></aside>
+<div class="drawer-backdrop" *ngIf="current()!=='appointments' && selectedSession()" (click)="closeSession()"></div><aside class="conversation-drawer2" *ngIf="current()!=='appointments' && selectedSession() as session" [style.top.px]="drawerPos().top" [style.left.px]="drawerPos().left" [style.max-height.px]="drawerPos().maxHeight"><div class="drawer-head2"><div><span class="eyebrow2">CONVERSATION DETAIL</span><h2>{{session.session_id}}</h2></div><button (click)="closeSession()">×</button></div><div class="player-row2" [class.disabled2]="!hasAudio(session)"><button class="play-btn2" [disabled]="!hasAudio(session) || audioLoading()" (click)="toggleAudioPlayback(session)">{{ audioLoading() ? '…' : (audioPlaying() ? '❚❚' : '▶') }}</button><input class="scrub2" type="range" min="0" max="100" [value]="audioDuration() ? (audioCurrentTime()/audioDuration()*100) : 0" [disabled]="!hasAudio(session)" (input)="seekAudio(session, $any($event.target).value / 100)"><span class="time2">{{ formatAudioTime(audioCurrentTime()) }} / {{ formatAudioTime(audioDuration()) }}</span><button class="download-btn2" [disabled]="!hasAudio(session)" (click)="downloadAudioRecording(session)">⭳</button></div><p class="drawer-error2" *ngIf="audioError()">{{ audioError() }}</p><div class="meta-grid2"><span><b class="meta-icon2">🕐</b>{{formatRecordingMeta(session.createdAt)}}</span><span><b class="meta-icon2">#</b>ID: {{truncateSessionId(session.session_id)}}</span><span><b class="meta-icon2">🏢</b>{{session.account_id||'—'}}</span><span><b class="meta-icon2">☎</b>{{session.caller_phone||'—'}}</span></div><div class="chat2" *ngIf="transcript(session).length; else noTranscript2"><div *ngFor="let turn of transcript(session)" class="bubble-row2" [class.patient-row2]="turn.speaker==='Patient'"><div class="bubble2" [class.patient-bubble2]="turn.speaker==='Patient'"><small>{{turn.speaker}}</small>{{turn.text}}</div></div></div><ng-template #noTranscript2><div class="drawer-empty2">Transcript is not available for this conversation.</div></ng-template></aside>

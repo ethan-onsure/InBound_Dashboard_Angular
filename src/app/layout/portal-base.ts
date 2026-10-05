@@ -10,7 +10,7 @@ import { finalize, forkJoin } from 'rxjs';
 export type PageKey = 'dashboard' | 'appointments' | 'appointment-requests'
   | 'cancel-appointment-report' | 'medical-staff-report' | 'book-appointment-report' | 'reschedule-appointment-report'
   | 'after-hour-report' | 'voicemail-report' | 'nursing-report' | 'reports' | 'settings';
-export type AppointmentSortColumn = 'appointmentType' | 'reasonText' | 'description' | 'startTime' | 'status' | 'createdAt';
+export type AppointmentSortColumn = 'startTime' | 'status' | 'createdAt';
 export interface NavItem { key: PageKey; label: string; icon: string; section: string; }
 
 const SECTION_LABELS: Record<string, string> = {
@@ -50,6 +50,11 @@ export abstract class PortalBase {
   get patientAppointmentsLoading() { return this.patientSearch.appointmentsLoading; }
   get patientAppointmentsError() { return this.patientSearch.appointmentsError; }
   retryPatientAppointments(): void { this.patientSearch.retryAppointments(); }
+  get recentPatients() { return this.patientSearch.recentPatients; }
+  get recentPatientsOpen() { return this.patientSearch.recentOpen; }
+  toggleRecentPatients(): void { this.patientSearch.toggleRecent(); }
+  closeRecentPatients(): void { this.patientSearch.closeRecent(); }
+  openRecentPatient(patient: ModMedPatient): void { this.patientSearch.openRecent(patient); }
   apptSortColumn = signal<AppointmentSortColumn>('startTime');
   apptSortDirection = signal<'asc' | 'desc'>('desc');
   private apptSortValue(item: AppointmentDetail, column: AppointmentSortColumn): string | number {
@@ -209,7 +214,7 @@ export abstract class PortalBase {
     this.current.set(this.nav.some(item => item.key === key) ? key : 'dashboard');
     if (this.current() !== 'dashboard' && this.current() !== 'reports' && this.current() !== 'settings') this.load();
     const id = setInterval(() => this.now.set(new Date()), 30000);
-    inject(DestroyRef).onDestroy(() => clearInterval(id));
+    inject(DestroyRef).onDestroy(() => { clearInterval(id); this.teardownAudio(); });
   }
   greeting(date: Date): string {
     const hours = date.getHours();
@@ -375,9 +380,11 @@ export abstract class PortalBase {
       this.drawerPos.set({ top, left, maxHeight });
       this.drawerPosLocked = true;
     }
+    this.teardownAudio();
     this.selectedSession.set(item);
   }
-  selectCall(item: DrawerItem): void { this.selectedSession.set(item); }
+  selectCall(item: DrawerItem): void { this.teardownAudio(); this.selectedSession.set(item); }
+  closeSession(): void { this.teardownAudio(); this.selectedSession.set(null); }
   reportDrawerItem(item: ReportRecord): DrawerItem {
     return { session_id: item.sessionId, caller_phone: item.mobile, account_id: item.name, createdAt: item.createdOn, transcript: item.transcript, audio_path: item.recording };
   }
@@ -415,11 +422,85 @@ export abstract class PortalBase {
       return result;
     } catch { return raw.trim() ? [{ speaker: 'Patient', text: raw.trim() }] : []; }
   }
-  // The API only returns a server-local filesystem path (audio_path/recording), not an
-  // HTTP-fetchable URL, and there's no endpoint yet to stream it. Recording playback stays
-  // disabled everywhere until a real URL is available here.
-  audioUrl(_item: { audio_path: string | null }): string | null { return null; }
-  hasAudio(item: { audio_path: string | null } | null): boolean { return !!item && !!this.audioUrl(item); }
+  hasAudio(item: { audio_path: string | null } | null): boolean { return !!item?.audio_path; }
+  private audioEl: HTMLAudioElement | null = null;
+  private audioObjectUrl: string | null = null;
+  private audioSessionId: string | null = null;
+  audioLoading = signal(false);
+  audioError = signal('');
+  audioPlaying = signal(false);
+  audioCurrentTime = signal(0);
+  audioDuration = signal(0);
+  // Fetches the recording through HttpClient (so the auth interceptor attaches the bearer
+  // token and handles 401 refresh) rather than pointing an <audio> tag straight at the API,
+  // which would bypass the interceptor entirely.
+  toggleAudioPlayback(item: DrawerItem): void {
+    if (this.audioSessionId === item.session_id && this.audioEl) {
+      if (this.audioEl.paused) void this.audioEl.play(); else this.audioEl.pause();
+      return;
+    }
+    this.teardownAudio();
+    this.audioSessionId = item.session_id;
+    this.audioLoading.set(true);
+    this.audioError.set('');
+    this.api.recording(item.session_id).subscribe({
+      next: blob => {
+        this.audioLoading.set(false);
+        const url = URL.createObjectURL(blob);
+        this.audioObjectUrl = url;
+        const audio = new Audio(url);
+        this.audioEl = audio;
+        audio.addEventListener('loadedmetadata', () => this.audioDuration.set(audio.duration || 0));
+        audio.addEventListener('timeupdate', () => this.audioCurrentTime.set(audio.currentTime));
+        audio.addEventListener('play', () => this.audioPlaying.set(true));
+        audio.addEventListener('pause', () => this.audioPlaying.set(false));
+        audio.addEventListener('ended', () => this.audioPlaying.set(false));
+        void audio.play();
+      },
+      error: () => { this.audioLoading.set(false); this.audioError.set('We could not load this recording.'); this.audioSessionId = null; },
+    });
+  }
+  seekAudio(item: DrawerItem, fraction: number): void {
+    if (this.audioSessionId === item.session_id && this.audioEl && this.audioDuration()) {
+      this.audioEl.currentTime = fraction * this.audioDuration();
+    }
+  }
+  downloadAudioRecording(item: DrawerItem): void {
+    if (this.audioSessionId === item.session_id && this.audioObjectUrl) {
+      this.triggerDownload(this.audioObjectUrl, item.session_id);
+      return;
+    }
+    this.api.recording(item.session_id).subscribe({
+      next: blob => {
+        const url = URL.createObjectURL(blob);
+        this.triggerDownload(url, item.session_id);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      },
+      error: () => this.audioError.set('We could not download this recording.'),
+    });
+  }
+  private triggerDownload(url: string, sessionId: string): void {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${sessionId}.mp3`;
+    a.click();
+  }
+  private teardownAudio(): void {
+    if (this.audioEl) { this.audioEl.pause(); this.audioEl.src = ''; this.audioEl = null; }
+    if (this.audioObjectUrl) { URL.revokeObjectURL(this.audioObjectUrl); this.audioObjectUrl = null; }
+    this.audioSessionId = null;
+    this.audioLoading.set(false);
+    this.audioError.set('');
+    this.audioPlaying.set(false);
+    this.audioCurrentTime.set(0);
+    this.audioDuration.set(0);
+  }
+  formatAudioTime(seconds: number): string {
+    if (!seconds || Number.isNaN(seconds)) return '00:00';
+    const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
+    const secs = Math.floor(seconds % 60).toString().padStart(2, '0');
+    return `${mins}:${secs}`;
+  }
   truncateSessionId(id: string): string { return id.length > 18 ? `${id.slice(0, 13)}...${id.slice(-4)}` : id; }
   formatRecordingMeta(value: string | null | undefined): string {
     if (!value) return '—';
