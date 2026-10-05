@@ -1,7 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { Observable, finalize, forkJoin, map } from 'rxjs';
 import { ApiService } from './api.service';
-import { ApiResponse, ModMedPatient } from './models';
+import { ApiResponse, AppointmentDetail, ModMedPatient } from './models';
 
 // State lives here (not on the page component) so it survives navigating away from and
 // back to the Patient Reports tab, since that route swap destroys/recreates the page
@@ -17,6 +17,9 @@ export class PatientSearchService {
   loading = signal(false);
   error = signal('');
   dropdownClosed = signal(false);
+  appointments = signal<AppointmentDetail[]>([]);
+  appointmentsLoading = signal(false);
+  appointmentsError = signal('');
   private lastSearchedTerm: string | null = null;
 
   // Accepts common DOB formats (ISO yyyy-MM-dd, or MM/DD/YYYY, MM-DD-YYYY) typed into the
@@ -65,12 +68,26 @@ export class PatientSearchService {
         if (patients.length === 1) {
           this.selected.set(patients[0]);
           this.dropdownClosed.set(true);
+          this.loadAppointments(patients[0]);
         }
       },
       error: () => this.error.set('We could not search patients. Please retry.'),
     });
   }
-  selectPatient(patient: ModMedPatient): void { this.selected.set(patient); this.dropdownClosed.set(true); }
+  private loadAppointments(patient: ModMedPatient): void {
+    this.appointmentsLoading.set(true);
+    this.appointmentsError.set('');
+    this.appointments.set([]);
+    this.api.appointmentDetails(String(patient.id)).pipe(finalize(() => this.appointmentsLoading.set(false))).subscribe({
+      next: response => {
+        if (!response.flag) { this.appointmentsError.set(response.msg || 'We could not load appointment history.'); return; }
+        this.appointments.set(Array.isArray(response.data) ? response.data : []);
+      },
+      error: () => this.appointmentsError.set('We could not load appointment history. Please retry.'),
+    });
+  }
+  retryAppointments(): void { const patient = this.selected(); if (patient) this.loadAppointments(patient); }
+  selectPatient(patient: ModMedPatient): void { this.selected.set(patient); this.dropdownClosed.set(true); this.loadAppointments(patient); }
   backToResults(): void { this.dropdownClosed.set(false); }
   closeDropdown(): void { this.dropdownClosed.set(true); }
   openDropdown(): void { if (this.results().length) this.dropdownClosed.set(false); }
@@ -82,5 +99,8 @@ export class PatientSearchService {
     this.error.set('');
     this.dropdownClosed.set(false);
     this.lastSearchedTerm = null;
+    this.appointments.set([]);
+    this.appointmentsLoading.set(false);
+    this.appointmentsError.set('');
   }
 }

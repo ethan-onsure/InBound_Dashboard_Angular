@@ -53,57 +53,40 @@
             <a class="ur-link2" *ngIf="patientResults().length > 1" (click)="backToPatientResults()">‹ Back to results</a>
             <a class="ur-link2" *ngIf="patientResults().length <= 1" (click)="clearUserReport()">‹ Cancel</a>
             <div class="ur-patient-title2">{{ patientDisplayName(patient) }} <span *ngIf="patient.birthDate">· {{ formatDate(patient.birthDate) }}</span></div>
-            <div class="ur-panel-actions2"><a class="ur-link2">Save</a><span>|</span><button class="ur-checkin2">Start Check-In ›</button></div>
           </div>
 
           <div class="ur-card2">
-            <div class="ur-card-head2">Manage Existing Appointment</div>
+            <div class="ur-card-head2">Appointment History</div>
             <div class="ur-card-body2">
-              <div class="ur-appt-date2">—</div>
-              <div class="ur-btn-row2">
-                <button class="ur-btn2" disabled>Link Appointment ▾</button>
-                <button class="ur-btn2 ur-btn-outline2">Cancel Appointment</button>
-                <button class="ur-btn2 ur-btn-solid2">Reschedule</button>
+              <div class="loading-state2" *ngIf="patientAppointmentsLoading()"><div class="spinner2"></div><p>Loading appointment history…</p></div>
+              <div class="error-state2" *ngIf="!patientAppointmentsLoading() && patientAppointmentsError()"><strong>Unable to load appointment history</strong><p>{{patientAppointmentsError()}}</p><button class="refresh-btn2" (click)="retryPatientAppointments()">Try again</button></div>
+              <div class="empty-state2" *ngIf="!patientAppointmentsLoading() && !patientAppointmentsError() && !patientAppointments().length"><span>◌</span><strong>No appointment history found</strong><p>This patient has no recorded appointments yet.</p></div>
+              <div class="table-scroll2" *ngIf="!patientAppointmentsLoading() && !patientAppointmentsError() && patientAppointments().length">
+                <table>
+                  <thead>
+                    <tr>
+                      <th class="sortable-th2" (click)="toggleApptSort('appointmentType')">Type<span class="sort-ind2" *ngIf="apptSortColumn()==='appointmentType'">{{apptSortDirection()==='asc'?'▲':'▼'}}</span></th>
+                      <th class="sortable-th2" (click)="toggleApptSort('reasonText')">Reason<span class="sort-ind2" *ngIf="apptSortColumn()==='reasonText'">{{apptSortDirection()==='asc'?'▲':'▼'}}</span></th>
+                      <th class="sortable-th2" (click)="toggleApptSort('description')">Description<span class="sort-ind2" *ngIf="apptSortColumn()==='description'">{{apptSortDirection()==='asc'?'▲':'▼'}}</span></th>
+                      <th>Appointment Date</th>
+                      <th class="sortable-th2" (click)="toggleApptSort('startTime')">Time<span class="sort-ind2" *ngIf="apptSortColumn()==='startTime'">{{apptSortDirection()==='asc'?'▲':'▼'}}</span></th>
+                      <th class="sortable-th2" (click)="toggleApptSort('status')">Status<span class="sort-ind2" *ngIf="apptSortColumn()==='status'">{{apptSortDirection()==='asc'?'▲':'▼'}}</span></th>
+                      <th class="sortable-th2" (click)="toggleApptSort('createdAt')">Created<span class="sort-ind2" *ngIf="apptSortColumn()==='createdAt'">{{apptSortDirection()==='asc'?'▲':'▼'}}</span></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let appt of sortedPatientAppointments()">
+                      <td><strong>{{appt.appointmentType||'—'}}</strong></td>
+                      <td>{{appt.reasonText||'—'}}</td>
+                      <td class="truncate2">{{appt.description||'—'}}</td>
+                      <td>{{formatDate(appt.startTime)}}</td>
+                      <td>{{formatTime(appt.startTime)}} – {{formatTime(appt.endTime)}}<span class="appt-duration2" *ngIf="appt.duration">({{appt.duration}})</span></td>
+                      <td><span class="badge2" [class.badge-success2]="appt.status==='fulfilled'">{{appt.status||'—'}}</span></td>
+                      <td>{{formatDateTime(appt.createdAt)}}</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
-
-              <div class="ur-grid2">
-                <div class="ur-fg2"><label>Appointment Date</label><input type="text" disabled placeholder="—"></div>
-                <div class="ur-fg2"><label>Status *</label><select disabled><option>—</option></select></div>
-              </div>
-              <div class="ur-grid2 ur-grid3-2">
-                <div class="ur-fg2"><label>Appointment Type *</label><input type="text" disabled placeholder="—"></div>
-                <div class="ur-fg2"><label>Start Time</label><input type="text" disabled placeholder="—"></div>
-                <div class="ur-fg2"><label>Duration</label><input type="text" disabled placeholder="—"></div>
-              </div>
-              <div class="ur-grid2 ur-grid3-2">
-                <div class="ur-fg2"><label>End Time</label><input type="text" disabled placeholder="—"></div>
-                <div class="ur-fg2"><label>Recurring Option</label><select disabled><option>—</option></select></div>
-                <div class="ur-fg2"></div>
-              </div>
-
-              <div class="ur-static-grid2">
-                <div><label>Patient Name</label><strong>{{ patientDisplayName(patient) }}</strong></div>
-                <div><label>Date of Birth</label><strong>{{ formatDate(patient.birthDate) }}</strong></div>
-                <div><label>Gender</label><strong>{{ patient.gender || '—' }}</strong></div>
-                <div><label>Phone</label><strong>{{ patientPhone(patient) }}</strong></div>
-                <div><label>Email</label><strong>{{ patientEmail(patient) }}</strong></div>
-                <div><label>MRN</label><strong>{{ patientMrn(patient) }}</strong></div>
-                <div><label>Provider</label><strong>—</strong></div>
-                <div><label>Location</label><strong>—</strong></div>
-                <div><label>Address</label><strong>{{ patientAddress(patient) }}</strong></div>
-              </div>
-
-              <label class="ur-check2"><input type="checkbox" disabled> New Patient</label>
-
-              <div class="ur-fg2"><label>Reason For Visit</label><select disabled><option>Select reason</option></select></div>
-              <div class="ur-fg2"><label>Reason For Visit Notes</label><textarea disabled rows="2"></textarea></div>
-              <div class="ur-fg2"><label>Reserve Resources</label><input type="text" disabled placeholder="Click to select..."></div>
-              <div class="ur-fg2"><label>Appointment Notes</label><textarea disabled rows="2"></textarea></div>
-
-              <label class="ur-check2"><input type="checkbox" disabled> Add to Waitlist</label>
-
-              <div class="ur-fg2"><label>Appointment Reminders</label><a class="ur-link2">0 Reminders</a></div>
-              <div class="ur-fg2"><label>Referral Sources</label><a class="ur-link2">+ Add Referral Source</a></div>
             </div>
           </div>
         </div>
@@ -111,17 +94,24 @@
         <aside class="ur-side2">
           <div class="ur-photo2"><img *ngIf="patientPhoto(patient) as photo" [src]="photo" alt="" class="ur-photo-img2"><span *ngIf="!patientPhoto(patient)">👤</span></div>
           <div class="ur-side-row2"><label>Patient Name</label><a class="ur-link2">{{ patientDisplayName(patient) }}</a></div>
+          <div class="ur-side-row2"><label>Date of Birth</label><span>{{ formatDate(patient.birthDate) }}</span></div>
           <div class="ur-side-row2"><label>MRN</label><span>{{ patientMrn(patient) }}</span></div>
+          <div class="ur-side-row2"><label>Phone</label><span>{{ patientPhone(patient) }}</span></div>
+          <div class="ur-side-row2"><label>Email</label><span>{{ patientEmail(patient) }}</span></div>
+          <div class="ur-side-row2"><label>Address</label><span>{{ patientAddress(patient) }}</span></div>
           <div class="ur-side-row2"><label>Status</label><select disabled><option>{{ patient.active ? 'Active' : 'Inactive' }}</option></select></div>
-          <a class="ur-link2 ur-side-link2">Release of PHI</a>
 
           <h4>Upcoming Appointments</h4>
-          <p class="ur-muted2">No upcoming appointments.</p>
+          <ul class="ur-appt-list2" *ngIf="upcomingAppointments().length; else noUpcoming2">
+            <li *ngFor="let item of upcomingAppointments()">{{ formatDate(item.startTime) }} — {{ item.appointmentType || 'Appointment' }} <span class="ur-appt-status2">({{ item.status || '—' }})</span></li>
+          </ul>
+          <ng-template #noUpcoming2><p class="ur-muted2">No upcoming appointments.</p></ng-template>
 
           <h4>Past Completed Appointments</h4>
-          <p class="ur-muted2">No past appointments.</p>
-
-          <a class="ur-link2 ur-side-link2">View Full History</a>
+          <ul class="ur-appt-list2" *ngIf="pastAppointments().length; else noPast2">
+            <li *ngFor="let item of pastAppointments()">{{ formatDate(item.startTime) }} — {{ item.appointmentType || 'Appointment' }} <span class="ur-appt-status2">({{ item.status || '—' }})</span></li>
+          </ul>
+          <ng-template #noPast2><p class="ur-muted2">No past appointments.</p></ng-template>
         </aside>
       </div>
     </ng-container>

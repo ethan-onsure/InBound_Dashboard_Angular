@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { ApiResponse, CallHistoryRecord, HourCallRate, ModMedPatient, MonthlyCallSummary, MonthlyIntentSummary, PagewiseModel, ReportRecord } from './models';
+import { ApiResponse, AppointmentDetail, CallHistoryRecord, HourCallRate, ModMedPatient, MonthlyCallSummary, MonthlyIntentSummary, PagewiseModel, ReportRecord } from './models';
 import { APP_CONFIG } from './app-config';
 
 export type ReportKind = 'cancel-appointment' | 'medical-staff' | 'book-appointment' | 'reschedule-appointment' | 'after-hour' | 'voicemail' | 'nursing';
@@ -39,4 +39,5 @@ export class ApiService {
   patientByName(id: string): Observable<ApiResponse<ModMedPatient[]>> { return this.http.post<ApiResponse<ModMedPatient[]>>(`${APP_CONFIG.apiBaseUrl}/api/ModMed/GetPatientDetailsByName`, { id }); }
   patientByFamily(id: string): Observable<ApiResponse<ModMedPatient[]>> { return this.http.post<ApiResponse<ModMedPatient[]>>(`${APP_CONFIG.apiBaseUrl}/api/ModMed/GetPatientDetailsByFamily`, { id }); }
   patientByDob(id: string): Observable<ApiResponse<ModMedPatient[]>> { return this.http.post<ApiResponse<ModMedPatient[]>>(`${APP_CONFIG.apiBaseUrl}/api/ModMed/GetPatientDetailsByDOB`, { id }); }
+  appointmentDetails(id: string): Observable<ApiResponse<AppointmentDetail[]>> { return this.http.post<ApiResponse<AppointmentDetail[]>>(`${APP_CONFIG.apiBaseUrl}/api/ModMed/GetAppointmentDetails`, { id }); }
 }

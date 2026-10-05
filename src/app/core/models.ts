@@ -22,3 +22,8 @@ export interface ModMedPatient {
   id: number; identifier: ModMedIdentifier[]; active: boolean; name: ModMedName[]; telecom: ModMedTelecom[];
   gender: string | null; birthDate: string | null; address: ModMedAddress[];
 }
+export interface AppointmentDetail {
+  appointmentId: number; appointmentType: string | null; reasonText: string | null; description: string | null;
+  startTime: string | null; endTime: string | null; duration: string | null; createdAt: string | null;
+  locationId: number | null; practitionerId: number | null; status: string | null; lastUpdated: string | null;
+}

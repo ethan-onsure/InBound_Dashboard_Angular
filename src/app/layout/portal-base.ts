@@ -4,12 +4,13 @@ import { ChartType } from 'angular-google-charts';
 import { ApiService, ReportKind } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { PatientSearchService } from '../core/patient-search.service';
-import { CallHistoryRecord, DailyCallSummary, DrawerItem, HourCallRate, ModMedPatient, MonthlyCallSummary, MonthlyIntentSummary, ReportRecord } from '../core/models';
+import { AppointmentDetail, CallHistoryRecord, DailyCallSummary, DrawerItem, HourCallRate, ModMedPatient, MonthlyCallSummary, MonthlyIntentSummary, ReportRecord } from '../core/models';
 import { finalize, forkJoin } from 'rxjs';
 
 export type PageKey = 'dashboard' | 'appointments' | 'appointment-requests'
   | 'cancel-appointment-report' | 'medical-staff-report' | 'book-appointment-report' | 'reschedule-appointment-report'
   | 'after-hour-report' | 'voicemail-report' | 'nursing-report' | 'reports' | 'settings';
+export type AppointmentSortColumn = 'appointmentType' | 'reasonText' | 'description' | 'startTime' | 'status' | 'createdAt';
 export interface NavItem { key: PageKey; label: string; icon: string; section: string; }
 
 const SECTION_LABELS: Record<string, string> = {
@@ -45,6 +46,54 @@ export abstract class PortalBase {
   get patientSearchLoading() { return this.patientSearch.loading; }
   get patientSearchError() { return this.patientSearch.error; }
   get patientDropdownClosed() { return this.patientSearch.dropdownClosed; }
+  get patientAppointments() { return this.patientSearch.appointments; }
+  get patientAppointmentsLoading() { return this.patientSearch.appointmentsLoading; }
+  get patientAppointmentsError() { return this.patientSearch.appointmentsError; }
+  retryPatientAppointments(): void { this.patientSearch.retryAppointments(); }
+  apptSortColumn = signal<AppointmentSortColumn>('startTime');
+  apptSortDirection = signal<'asc' | 'desc'>('desc');
+  private apptSortValue(item: AppointmentDetail, column: AppointmentSortColumn): string | number {
+    if (column === 'startTime' || column === 'createdAt') {
+      const time = item[column] ? new Date(item[column] as string).getTime() : 0;
+      return Number.isNaN(time) ? 0 : time;
+    }
+    return (item[column] || '').toString().toLowerCase();
+  }
+  readonly sortedPatientAppointments = computed(() => {
+    const column = this.apptSortColumn();
+    const direction = this.apptSortDirection();
+    const sign = direction === 'asc' ? 1 : -1;
+    return [...this.patientAppointments()].sort((a, b) => {
+      const av = this.apptSortValue(a, column);
+      const bv = this.apptSortValue(b, column);
+      return av < bv ? -sign : av > bv ? sign : 0;
+    });
+  });
+  toggleApptSort(column: AppointmentSortColumn): void {
+    if (this.apptSortColumn() === column) {
+      this.apptSortDirection.update(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      this.apptSortColumn.set(column);
+      this.apptSortDirection.set('desc');
+    }
+  }
+  private appointmentTime(item: AppointmentDetail): number {
+    const time = item.startTime ? new Date(item.startTime).getTime() : NaN;
+    return Number.isNaN(time) ? 0 : time;
+  }
+  readonly upcomingAppointments = computed(() => {
+    const now = Date.now();
+    return this.patientAppointments()
+      .filter(item => this.appointmentTime(item) > now)
+      .sort((a, b) => this.appointmentTime(a) - this.appointmentTime(b));
+  });
+  readonly pastAppointments = computed(() => {
+    const now = Date.now();
+    return this.patientAppointments()
+      .filter(item => this.appointmentTime(item) > 0 && this.appointmentTime(item) <= now)
+      .sort((a, b) => this.appointmentTime(b) - this.appointmentTime(a))
+      .slice(0, 4);
+  });
   monthlySummary = signal<MonthlyCallSummary | null>(null);
   monthlyIntentSummary = signal<MonthlyIntentSummary | null>(null);
   hourCallRates = signal<HourCallRate[]>([]);
@@ -312,6 +361,7 @@ export abstract class PortalBase {
   }
   formatDate(value: string | null | undefined): string { if (!value) return '—'; const date = new Date(value); return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat('en-US',{month:'short',day:'numeric',year:'numeric'}).format(date); }
   formatDateTime(value: string | null | undefined): string { if (!value) return '—'; const date = new Date(value); return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}).format(date); }
+  formatTime(value: string | null | undefined): string { if (!value) return '—'; const date = new Date(value); return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat('en-US',{hour:'numeric',minute:'2-digit'}).format(date); }
   openSession(item: DrawerItem, button: HTMLElement): void {
     if (!this.drawerPosLocked) {
       const rect = button.getBoundingClientRect();
