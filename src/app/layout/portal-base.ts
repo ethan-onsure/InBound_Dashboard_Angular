@@ -1,9 +1,11 @@
 import { DestroyRef, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
+import { ChartType } from 'angular-google-charts';
 import { ApiService, ReportKind } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
-import { BookingRequest, CallHistoryRecord, DrawerItem, ReportRecord } from '../core/models';
-import { finalize } from 'rxjs';
+import { PatientSearchService } from '../core/patient-search.service';
+import { CallHistoryRecord, DailyCallSummary, DrawerItem, HourCallRate, ModMedPatient, MonthlyCallSummary, MonthlyIntentSummary, ReportRecord } from '../core/models';
+import { finalize, forkJoin } from 'rxjs';
 
 export type PageKey = 'dashboard' | 'appointments' | 'appointment-requests'
   | 'cancel-appointment-report' | 'medical-staff-report' | 'book-appointment-report' | 'reschedule-appointment-report'
@@ -30,9 +32,23 @@ const REPORT_KINDS: Partial<Record<PageKey, ReportKind>> = {
 export abstract class PortalBase {
   readonly Math = Math;
   readonly auth = inject(AuthService); protected readonly api = inject(ApiService); protected readonly router = inject(Router);
-  collapsed = signal(false); mobileOpen = signal(false); profileMenuOpen = signal(false); logoutConfirming = signal(false); current = signal<PageKey>('dashboard'); page = signal(1); readonly pageSize = 10; total = signal(0); loading = signal(false); error = signal(''); search = signal('');
-  callHistory = signal<CallHistoryRecord[]>([]); bookings = signal<BookingRequest[]>([]); reports = signal<ReportRecord[]>([]); selectedSession = signal<DrawerItem | null>(null);
-  userReportName = signal(''); userReportDob = signal(''); userReportSearched = signal(false);
+  private readonly patientSearch = inject(PatientSearchService);
+  collapsed = signal(false); mobileOpen = signal(false); profileMenuOpen = signal(false); logoutConfirming = signal(false); current = signal<PageKey>('dashboard'); page = signal(1); readonly pageSize = 10; total = signal(0); loading = signal(false); error = signal(''); search = signal(''); reportStartDate = signal<Date | null>(null); reportEndDate = signal<Date | null>(null);
+  callHistory = signal<CallHistoryRecord[]>([]); reports = signal<ReportRecord[]>([]); selectedSession = signal<DrawerItem | null>(null);
+  // Proxy the same signal instances from PatientSearchService (a root singleton) so the
+  // Patient Reports search state survives navigating away and back — this page component
+  // gets destroyed/recreated on every route change since each tab is a distinct route.
+  get userReportName() { return this.patientSearch.searchTerm; }
+  get userReportSearched() { return this.patientSearch.searched; }
+  get patientResults() { return this.patientSearch.results; }
+  get selectedPatient() { return this.patientSearch.selected; }
+  get patientSearchLoading() { return this.patientSearch.loading; }
+  get patientSearchError() { return this.patientSearch.error; }
+  get patientDropdownClosed() { return this.patientSearch.dropdownClosed; }
+  monthlySummary = signal<MonthlyCallSummary | null>(null);
+  monthlyIntentSummary = signal<MonthlyIntentSummary | null>(null);
+  hourCallRates = signal<HourCallRate[]>([]);
+  chartsLoading = signal(false);
   drawerPos = signal({ top: 0, left: 0, maxHeight: 560 });
   private drawerPosLocked = false;
   readonly now = signal(new Date());
@@ -47,6 +63,98 @@ export abstract class PortalBase {
   readonly filteredReports = computed(() => this.reports().filter(item => `${item.sessionId} ${item.mobile} ${item.name}`.toLowerCase().includes(this.search().toLowerCase())));
   readonly activeSection = computed(() => this.nav.find(n => n.key === this.current())?.section || 'MAIN');
   readonly isReportPage = computed(() => this.current() in REPORT_KINDS);
+  readonly summaryBars = computed(() => {
+    const summary = this.monthlySummary();
+    if (!summary) return [];
+    return [
+      { label: 'In Process', value: summary.inProcessCount },
+      { label: 'Handoff', value: summary.handoffCount },
+      { label: 'Completed', value: summary.completedCount },
+    ];
+  });
+  readonly pieChartType = ChartType.PieChart;
+  readonly pieChartColumns = ['Status', 'Calls'];
+  readonly pieChartOptions = {
+    colors: ['#f4a53a', '#4338ca', '#16a34a'],
+    pieHole: 0.4,
+    legend: { position: 'bottom' },
+    chartArea: { width: '90%', height: '78%' },
+  };
+  readonly pieChartRows = computed(() => this.summaryBars().map(b => [b.label, b.value]));
+  readonly lineChartType = ChartType.Line;
+  readonly lineChartColumns = computed(() => ['Day', 'In Process', 'Handoff', 'Completed']);
+  readonly lineChartOptions = {
+    colors: ['#f4a53a', '#4338ca', '#16a34a'],
+    legend: { position: 'bottom' },
+    hAxis: { title: 'Day of Month' },
+    vAxis: { title: 'Calls', minValue: 0 },
+    chartArea: { width: '85%', height: '68%' },
+  };
+  readonly lineChartRows = computed(() => {
+    const days = this.monthlySummary()?.dailyBreakdown ?? [];
+    if (!days.length) return [];
+    const validDates = days.map(d => new Date(d.callDate)).filter(d => !Number.isNaN(d.getTime()));
+    const ref = validDates[0] ?? this.now();
+    const year = ref.getFullYear();
+    const month = ref.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const byDay = new Map<number, DailyCallSummary>();
+    for (const d of days) {
+      const date = new Date(d.callDate);
+      if (!Number.isNaN(date.getTime())) byDay.set(date.getDate(), d);
+    }
+    return Array.from({ length: daysInMonth }, (_, i) => {
+      const dayNum = i + 1;
+      const entry = byDay.get(dayNum);
+      return [dayNum, entry?.inProcessCount ?? 0, entry?.handoffCount ?? 0, entry?.completedCount ?? 0];
+    });
+  });
+  readonly barChartType = ChartType.Bar;
+  readonly barChartColumns = ['Intent', 'Count'];
+  readonly barChartOptions = {
+    colors: ['#4338ca'],
+    legend: { position: 'none' },
+    bars: 'horizontal',
+    hAxis: { title: 'Calls', minValue: 0 },
+    chartArea: { width: '70%', height: '80%' },
+  };
+  readonly barChartRows = computed(() => {
+    const s = this.monthlyIntentSummary();
+    if (!s) return [];
+    return [
+      ['Cancel', s.cancel_Count],
+      ['Voicemail', s.voiceMail_Count],
+      ['After Hour', s.afterHour_Count],
+      ['Reschedule', s.reschedule_Count],
+      ['Book', s.book_Count],
+      ['Medical Staff', s.medicalStaff_Count],
+      ['Nursing', s.nursing_Count],
+    ];
+  });
+  readonly hourChartType = ChartType.ColumnChart;
+  readonly hourChartColumns = ['Hour', 'Calls', { type: 'string', role: 'tooltip' }];
+  readonly hourChartOptions = {
+    colors: ['#4338ca'],
+    legend: { position: 'none' },
+    hAxis: { title: 'Hour of Day', slantedText: true, slantedTextAngle: 90, textStyle: { fontSize: 10 } },
+    vAxis: { title: 'Calls', minValue: 0 },
+    chartArea: { width: '90%', height: '56%' },
+  };
+  private hourRangeLabel(timeSlot: string): string {
+    const [startRaw, endRaw] = timeSlot.split(' - ');
+    const meridiem = (s: string) => s.match(/AM|PM/)?.[0] ?? '';
+    const hourNum = (s: string) => s.replace(/\s?(AM|PM)/, '').replace(/^0/, '');
+    const startMeridiem = meridiem(startRaw);
+    const endMeridiem = meridiem(endRaw);
+    return startMeridiem === endMeridiem
+      ? `${hourNum(startRaw)}-${hourNum(endRaw)}${endMeridiem}`
+      : `${hourNum(startRaw)}${startMeridiem}-${hourNum(endRaw)}${endMeridiem}`;
+  }
+  readonly hourChartRows = computed(() => this.hourCallRates().map(h => {
+    const axisLabel = h.timeSlot.split(' - ')[0].replace(/^0/, '');
+    const tooltip = `${this.hourRangeLabel(h.timeSlot)} Calls: ${h.callCount}`;
+    return [axisLabel, h.callCount, tooltip];
+  }));
   constructor() {
     const key = this.router.url.split('/')[1] as PageKey || 'dashboard';
     this.current.set(this.nav.some(item => item.key === key) ? key : 'dashboard');
@@ -69,12 +177,12 @@ export abstract class PortalBase {
     if (!next) this.logoutConfirming.set(false);
   }
   closeProfileMenu(): void { this.profileMenuOpen.set(false); this.logoutConfirming.set(false); }
-  logout(): void { this.auth.logout(); }
+  logout(): void { this.patientSearch.clear(); this.auth.logout(); }
   load(): void {
     this.loading.set(true); this.error.set('');
     const reportKind = REPORT_KINDS[this.current()];
     if (reportKind) {
-      this.api.report(reportKind).pipe(finalize(() => this.loading.set(false))).subscribe({
+      this.api.report(reportKind, this.isoDate(this.reportStartDate()), this.isoDate(this.reportEndDate())).pipe(finalize(() => this.loading.set(false))).subscribe({
         next: response => {
           if (!response.flag) { this.error.set(response.msg || 'The server could not load this report.'); return; }
           const data = Array.isArray(response.data) ? response.data : [];
@@ -97,26 +205,111 @@ export abstract class PortalBase {
       });
       return;
     }
-    const body = { pageNumber: this.page(), pageSize: this.pageSize };
-    this.api.bookings(body).pipe(finalize(() => this.loading.set(false))).subscribe({
-      next: response => {
-        if (!response.flag) {
-          this.error.set(response.msg || 'The server could not load this queue.');
-          return;
-        }
-        const data = Array.isArray(response.data) ? response.data : [];
-        this.total.set((data[0] as { totalCount?: number } | undefined)?.totalCount || 0);
-        this.bookings.set(data);
-      },
-      error: () => {
-        this.error.set('We could not load this queue. Please retry.');
-      },
-    });
+    if (this.current() === 'appointment-requests') {
+      this.loading.set(false);
+      this.total.set(0);
+      this.chartsLoading.set(true);
+      forkJoin({
+        summary: this.api.monthlyCallSummary(),
+        intent: this.api.monthlyIntentSummary(),
+        hourly: this.api.hourCallRate(),
+      }).pipe(finalize(() => this.chartsLoading.set(false))).subscribe({
+        next: ({ summary, intent, hourly }) => {
+          this.monthlySummary.set(summary.flag ? summary.data : null);
+          this.monthlyIntentSummary.set(intent.flag ? intent.data : null);
+          this.hourCallRates.set(hourly.flag && Array.isArray(hourly.data) ? hourly.data : []);
+        },
+        error: () => {
+          this.monthlySummary.set(null);
+          this.monthlyIntentSummary.set(null);
+          this.hourCallRates.set([]);
+        },
+      });
+    }
   }
   pageChange(page: number): void { this.page.set(page); this.load(); }
-  // UI-only for now: no lookup endpoint is wired up yet, so this just reveals the layout shell.
-  searchUserReport(): void { if (this.userReportName().trim() || this.userReportDob()) this.userReportSearched.set(true); }
-  clearUserReport(): void { this.userReportSearched.set(false); this.userReportName.set(''); this.userReportDob.set(''); }
+  private isoDate(date: Date | null): string { return date ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}` : ''; }
+  applyReportDateFilter(): void { this.load(); }
+  clearReportDateFilter(): void { this.reportStartDate.set(null); this.reportEndDate.set(null); this.load(); }
+  readonly canExport = computed(() => this.current() === 'appointments' || this.isReportPage());
+  private reportExportColumns(key: PageKey): { header: string; value: (item: ReportRecord) => string }[] {
+    const mobile = { header: 'Mobile', value: (i: ReportRecord) => i.mobile || '—' };
+    const patient = { header: 'Patient', value: (i: ReportRecord) => i.name || '—' };
+    const reason = { header: 'Reason', value: (i: ReportRecord) => i.reason || '—' };
+    const lastUpdate = { header: 'Last update', value: (i: ReportRecord) => this.formatDateTime(i.lastUpdate) };
+    const created = { header: 'Created', value: (i: ReportRecord) => this.formatDateTime(i.createdOn) };
+    const status = { header: 'Status', value: (i: ReportRecord) => this.readLabel(i) };
+    switch (key) {
+      case 'cancel-appointment-report': return [mobile, patient, { header: 'Date of birth', value: i => this.formatDate(i.dob) }, { header: 'Appointment date', value: i => this.formatDate(i.appointmentDate) }, lastUpdate, created, status];
+      case 'medical-staff-report': return [mobile, patient, reason, lastUpdate, created, status];
+      case 'book-appointment-report': return [mobile, patient, reason, { header: 'Preferred date', value: i => i.preferredDate || '—' }, lastUpdate, created, status];
+      case 'reschedule-appointment-report': return [mobile, patient, { header: 'Current appointment', value: i => i.currentAppointmentDate || '—' }, { header: 'Preferred date', value: i => i.preferredDate || '—' }, lastUpdate, created, status];
+      case 'after-hour-report': return [mobile, patient, reason, lastUpdate, created, status];
+      case 'voicemail-report': return [mobile, patient, { header: 'Message', value: i => i.transcript || '—' }, lastUpdate, created, status];
+      case 'nursing-report': return [mobile, patient, reason, lastUpdate, created, status];
+      default: return [mobile, patient, lastUpdate, created, status];
+    }
+  }
+  exporting = signal(false);
+  async exportToExcel(): Promise<void> {
+    const key = this.current();
+    let header: string[];
+    let rows: string[][];
+    if (key === 'appointments') {
+      header = ['Mobile', 'Status', 'Duration', 'Date & time'];
+      rows = this.callHistory().map(item => [item.mobile || '—', item.status || '—', this.formatDuration(item.duration), this.formatDateTime(item.createdAt)]);
+    } else if (this.isReportPage()) {
+      const columns = this.reportExportColumns(key);
+      header = columns.map(c => c.header);
+      rows = this.filteredReports().map(item => columns.map(c => c.value(item)));
+    } else {
+      return;
+    }
+    this.exporting.set(true);
+    try {
+      const XLSX = await import('xlsx');
+      const sheet = XLSX.utils.aoa_to_sheet([header, ...rows]);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, sheet, 'Report');
+      XLSX.writeFile(workbook, `${key}-${this.isoDate(this.now())}.xlsx`);
+    } finally {
+      this.exporting.set(false);
+    }
+  }
+  searchUserReport(): void { this.patientSearch.search(); }
+  selectPatient(patient: ModMedPatient): void { this.patientSearch.selectPatient(patient); }
+  backToPatientResults(): void { this.patientSearch.backToResults(); }
+  closePatientDropdown(): void { this.patientSearch.closeDropdown(); }
+  openPatientDropdown(): void { this.patientSearch.openDropdown(); }
+  clearUserReport(): void { this.patientSearch.clear(); }
+  patientDisplayName(patient: ModMedPatient | null): string {
+    const n = patient?.name?.[0];
+    if (!n) return '—';
+    const given = (n.given || []).join(' ');
+    return [n.family, given].filter(Boolean).join(', ') || '—';
+  }
+  patientMrn(patient: ModMedPatient | null): string { return patient?.identifier?.[0]?.value || '—'; }
+  patientPms(patient: ModMedPatient | null): string { return patient?.identifier?.find(i => i.system === 'PMS')?.value || '—'; }
+  patientPhone(patient: ModMedPatient | null): string {
+    const mobile = patient?.telecom?.find(t => t.system === 'phone' && t.use === 'mobile');
+    const anyPhone = patient?.telecom?.find(t => t.system === 'phone');
+    return (mobile || anyPhone)?.value || '—';
+  }
+  patientEmail(patient: ModMedPatient | null): string {
+    return patient?.telecom?.find(t => t.system === 'email')?.value || '—';
+  }
+  patientAddress(patient: ModMedPatient | null): string {
+    const a = patient?.address?.[0];
+    if (!a) return '—';
+    const line = (a.line || []).join(', ');
+    return [line, a.city, a.state, a.postalCode].filter(Boolean).join(', ') || '—';
+  }
+  patientPhoto(patient: ModMedPatient | null): string | null {
+    const gender = patient?.gender?.toLowerCase();
+    if (gender === 'male') return 'Genric_M.jpg';
+    if (gender === 'female') return 'Genric_F.jpg';
+    return null;
+  }
   formatDate(value: string | null | undefined): string { if (!value) return '—'; const date = new Date(value); return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat('en-US',{month:'short',day:'numeric',year:'numeric'}).format(date); }
   formatDateTime(value: string | null | undefined): string { if (!value) return '—'; const date = new Date(value); return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}).format(date); }
   openSession(item: DrawerItem, button: HTMLElement): void {
@@ -149,12 +342,16 @@ export abstract class PortalBase {
   }
   isReadValue(item: ReportRecord): boolean { return item.isRead === true || item.isRead === 1; }
   readLabel(item: ReportRecord): string { return this.isReadValue(item) ? 'Completed' : 'New'; }
-  // Flips isRead locally so the toggle and row highlight respond immediately. No update
-  // endpoint exists yet to persist this — once one is provided, call it here too (optimistic
-  // update, roll back on failure).
+  // Optimistic: flips isRead locally first so the toggle and row highlight respond
+  // immediately, then persists via the per-report-kind flag endpoint. Rolls back on failure.
   toggleRead(item: ReportRecord): void {
+    const reportKind = REPORT_KINDS[this.current()];
+    if (!reportKind) return;
     const next = !this.isReadValue(item);
-    this.reports.update(list => list.map(r => r === item ? { ...r, isRead: next } : r));
+    this.reports.update(list => list.map(r => r.sessionId === item.sessionId ? { ...r, isRead: next } : r));
+    this.api.updateReadFlag(reportKind, item.sessionId, next).subscribe({
+      error: () => this.reports.update(list => list.map(r => r.sessionId === item.sessionId ? { ...r, isRead: !next } : r)),
+    });
   }
   transcript(item: { transcript: string | null }): { speaker: 'AI'|'Patient'; text: string }[] {
     const raw = item.transcript || '';

@@ -1,3 +1,29 @@
+@use '@angular/material' as mat;
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
+
+html {
+  @include mat.theme((
+    color: (
+      theme-type: light,
+      primary: mat.$violet-palette,
+      use-system-variables: true,
+    ),
+    typography: 'DM Sans',
+    density: 0,
+  ));
+
+  // Material's default M3 palette renders in purple/pink. Override the system
+  // color variables with white/grey tones matching the rest of the Aidentive UI
+  // so Material components (currently just the report date-range picker) blend in.
+  --mat-sys-primary: #3a3d4d;
+  --mat-sys-on-primary: #ffffff;
+  --mat-sys-primary-container: #e7e8ef;
+  --mat-sys-on-primary-container: #24263a;
+  --mat-sys-surface-container-high: #ffffff;
+  --mat-sys-on-surface: #14172b;
+  --mat-sys-on-surface-variant: #565c7d;
+  --mat-sys-outline: #dcdeee;
+}
+
 :root{font-family:'DM Sans',Arial,sans-serif;color:#18334f;background:#f5f7fa;font-synthesis:none;text-rendering:optimizeLegibility}
 *{box-sizing:border-box}html,body{margin:0;min-height:100%;background:#f5f7fa}button,input{font-family:inherit}
