@@ -32,7 +32,7 @@
           <div class="ur-dropdown2" *ngIf="userReportSearched() && !patientDropdownClosed()" (click)="$event.stopPropagation()">
             <div class="ur-dropdown-msg2" *ngIf="patientSearchLoading()"><div class="spinner2"></div><p>Searching patients…</p></div>
             <div class="ur-dropdown-msg2" *ngIf="!patientSearchLoading() && patientSearchError()"><strong>Unable to search patients</strong><p>{{patientSearchError()}}</p><button class="refresh-btn2" (click)="searchUserReport()">Try again</button></div>
-            <div class="ur-dropdown-msg2" *ngIf="!patientSearchLoading() && !patientSearchError() && !patientResults().length"><strong>No patients found</strong><p>Try a different name, family name, or date of birth.</p></div>
+            <div class="ur-dropdown-msg2" *ngIf="!patientSearchLoading() && !patientSearchError() && !patientResults().length"><strong>No patients found</strong><p>Try a different name, family name, date of birth, or MRN.</p></div>
             <div class="ur-dropdown-list2" *ngIf="!patientSearchLoading() && !patientSearchError() && patientResults().length">
               <button class="ur-dropdown-item2" *ngFor="let p of patientResults()" (click)="selectPatient(p)">
                 <span class="ur-dd-name2">{{ p.name?.[0]?.family || '—' }}, {{ (p.name?.[0]?.given || []).join(' ') || '—' }}</span>
@@ -58,7 +58,7 @@
         <button class="ur-clear-btn2" *ngIf="userReportSearched()" (click)="clearUserReport()">✕ Clear</button>
       </div>
 
-      <div class="coming2" *ngIf="!selectedPatient()"><span class="coming-icon2">▥</span><h2>{{ userReportSearched() && patientResults().length ? 'Select a patient' : 'Look up a patient' }}</h2><p>{{ userReportSearched() && patientResults().length ? 'Choose a match from the search results above.' : 'Enter a patient name, phone, or DOB, then search to view their record.' }}</p></div>
+      <div class="coming2" *ngIf="!selectedPatient()"><span class="coming-icon2">▥</span><h2>{{ userReportSearched() && patientResults().length ? 'Select a patient' : 'Look up a patient' }}</h2><p>{{ userReportSearched() && patientResults().length ? 'Choose a match from the search results above.' : 'Enter a patient name, phone, DOB, or MRN, then search to view their record.' }}</p></div>
 
       <div class="ur-panel2" *ngIf="selectedPatient() as patient">
         <div class="ur-main2">

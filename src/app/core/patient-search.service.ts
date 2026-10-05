@@ -35,6 +35,11 @@ export class PatientSearchService {
     if (m) return `${m[3]}-${m[1].padStart(2, '0')}-${m[2].padStart(2, '0')}`;
     return null;
   }
+  // Anything with a digit that isn't a recognized DOB and has no spaces (e.g. "MM0000433977")
+  // is treated as an MRN lookup rather than a name/family-name search.
+  private looksLikeMrn(raw: string): boolean {
+    return /\d/.test(raw) && !/\s/.test(raw);
+  }
   private extractPatients(response: ApiResponse<ModMedPatient[]>): ModMedPatient[] {
     return response.flag && Array.isArray(response.data) ? response.data : [];
   }
@@ -61,6 +66,8 @@ export class PatientSearchService {
     const dob = this.parseDob(raw);
     const request$: Observable<ModMedPatient[]> = dob
       ? this.api.patientByDob(dob).pipe(map(r => this.extractPatients(r)))
+      : this.looksLikeMrn(raw)
+      ? this.api.patientByMrn(raw).pipe(map(r => this.extractPatients(r)))
       : forkJoin([this.api.patientByName(raw), this.api.patientByFamily(raw)]).pipe(
           map(([byName, byFamily]) => this.mergePatients(this.extractPatients(byName), this.extractPatients(byFamily))),
         );
